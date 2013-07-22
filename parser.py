@@ -6,8 +6,8 @@ import urllib2
 def parse_rss(content):
     soup = BeautifulSoup(content, 'xml')
 
-    title = soup.title.text
-    link = soup.link.text
+    title = soup.channel.title.text
+    link = soup.channel('link', {'type': ''})[0].text
 
     print "%s(%s)" % (title, link)
 
