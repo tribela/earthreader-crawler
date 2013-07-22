@@ -1,39 +1,43 @@
 #!/usr/bin/env python
 
-from bs4 import BeautifulSoup
+from xml.etree import ElementTree
 import urllib2
+from dateutil import parser as DateTimeParser
 
-def parse_rss(content):
-    soup = BeautifulSoup(content, 'xml')
+def parse_rss(tree):
+    title = tree.find('./channel/title').text
+    link = tree.find('./channel/link').text
+    lastmodified = DateTimeParser.parse(tree.find('./channel/lastBuildDate').text)
 
-    title = soup.channel.title.text
-    link = soup.channel('link', {'type': ''})[0].text
+    print "%s(%s) at %s" % (title, link, str(lastmodified))
 
-    print "%s(%s)" % (title, link)
+    for item in tree.findall('./channel/item'):
+        title = item.find('title').text
+        link = item.find('link').text
+        uid = item.find('guid').text
+        pubdate = DateTimeParser.parse(item.find('pubDate').text)
+        #content = item.find('encoded').text
 
-    items = soup('item')
-    for item in items:
-        title = item.title.text
-        link = item.link.text
-        uid = item.guid.text
+        print " %s(%s) at %s" % (title, link, str(pubdate))
 
-        print " %s(%s) - (%s)" % (title, link, uid)
-
-def parse_atom(content):
+def parse_atom(tree):
     pass
 
-def parse_feed(feed_type, url):
+def parse_feed(url):
     try:
-        content = urllib2.urlopen(url).read()
-        if feed_type in ['rss', 'rss+xml']:
-            parse_rss(content)
-        elif feed_type in ['atom', 'atom+xml']:
-            parse_atom(content)
+        handle = urllib2.urlopen(url)
+        tree = ElementTree.parse(handle)
+
+        root = tree.getroot()
+
+        if root.tag == 'rss':
+            parse_rss(tree)
+        elif root.tag == 'feed':
+            parse_atom(tree)
     except urllib2.URLError, e:
         return None
 
 if __name__ == '__main__':
-    feed_type = raw_input('Input type: ')
     url = raw_input('Input url: ')
 
-    parse_feed(feed_type, url)
+    parse_feed(url)
