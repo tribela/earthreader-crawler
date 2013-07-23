@@ -7,18 +7,17 @@ from dateutil import parser as DateTimeParser
 def parse_rss(tree):
     title = tree.find('./channel/title').text
     link = tree.find('./channel/link').text
-    lastmodified = DateTimeParser.parse(tree.find('./channel/lastBuildDate').text)
 
-    print "%s(%s) at %s" % (title, link, str(lastmodified))
+    print "%s(%s)" % (title, link)
 
     for item in tree.findall('./channel/item'):
         title = item.find('title').text
         link = item.find('link').text
         uid = item.find('guid').text
         pubdate = DateTimeParser.parse(item.find('pubDate').text)
-        #content = item.find('encoded').text
+        content = item.find('description').text
 
-        print " %s(%s) at %s" % (title, link, str(pubdate))
+        print " %s(%s) at %s: %s" % (title, link, str(pubdate), content[:20])
 
 def parse_atom(tree):
     pass

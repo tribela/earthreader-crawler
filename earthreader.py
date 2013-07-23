@@ -26,7 +26,7 @@ def open_database():
             feedurl text unique not null primary key,
             title text,
             linkurl text,
-            lastaccess timestamp not null
+            lastaccess datetime not null
             );"""
         )
 
@@ -58,4 +58,34 @@ def add_url(conn, url):
         link_tags = soup('link', {'type': re.compile(r'application/(rss|atom)\+xml')})
         urls += map(lambda x: x['href'], link_tags)
 
-    #TODO: insert into DB here
+    for url in urls:
+        try:
+            print url
+            #TODO: join to one query
+            #TODO: add title, linkurl
+            conn.execute("insert into feeds(feedurl, lastaccess) values('%s', datetime('now'))" % (url))
+        except sqlite3.OperationalError, e:
+            print >> stderr, "Failed to insert " + url
+            print dir(e)
+            pass
+    conn.commit()
+
+
+if __name__ == '__main__':
+    conn = open_database()
+
+    line = raw_input("Input command: ")
+    while len(line) > 0:
+        if line == 'add':
+            url = raw_input("Input url: ")
+            add_url(conn, url)
+        elif line == 'crawl':
+            cur = conn.execute("select feedurl, lastaccess from feeds")
+            for row in cur.fetchall():
+                #TODO: crawl
+                print row[0], row[1]
+
+        line = raw_input("Input command: ")
+
+    conn.commit()
+    conn.close()
