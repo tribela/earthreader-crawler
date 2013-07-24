@@ -46,6 +46,25 @@ def open_database():
 
     return conn
 
+def query_feed_info(url):
+    handle = urllib2.urlopen(url)
+    last_modified = handle.headers.getheader('Last-Modified')
+
+    tree = ElementTree.parse(handle)
+    root = tree.getroot()
+
+    #TODO: add items to DB
+
+    if root.tag == 'rss':
+        title = tree.find('./channel/title').text
+        link = tree.find('./channel/link').text
+    elif root.tag == 'feed': #atom
+        #FIXME: read ATOM spec document
+        title = 'title'
+        link = url
+
+    return (title, link, last_modified)
+
 def add_url(conn, url):
     handle = urllib2.urlopen(url)
     content_type = handle.headers.getheader('Content-Type')
@@ -61,22 +80,35 @@ def add_url(conn, url):
     for url in urls:
         try:
             print url
-            #TODO: join to one query
-            #TODO: add title, linkurl
-            conn.execute("insert into feeds(feedurl, lastmodified) values('%s', datetime('now'))" % (url))
+            #FIXME: join to one query
+            (title, link, last_modified) = query_feed_info(url)
+            #escape
+            title = title.replace("'", "''")
+            link = link.replace("'", "''")
+            last_modified = last_modified.replace('"', '""')
+            conn.execute(
+                "insert into feeds(feedurl, title, linkurl, lastmodified) values('%s', '%s', '%s', '%s')" %
+                (url, title, link, last_modified)
+            )
         except sqlite3.OperationalError, e:
             print >> stderr, "Failed to insert " + url
-            print dir(e)
-            pass
+            print >> stderr, e.args
     conn.commit()
 
 def add_item(conn, feedurl, uid, title, link, pubdate, content):
     #escape doublequote in sqlite " -> ""
-    title = title.replace('"', '""')
-    content = content.replace('"', '""')
+    feedurl = feedurl.replace("'", "''")
+    uid = uid.replace("'", "''")
+    title = title.replace("'", "''")
+    link = link.replace("'", "''")
+    pubdate = pubdate.replace("'", "''")
+    content = content.replace("'", "''")
 
     try:
-        conn.execute("insert into items(feedurl, uid title, link, pubdate, content")
+        conn.execute(
+            "insert into items(feedurl, uid, title, link, pubdate, content) values('%s', '%s', '%s', '%s', '%s', '%s')" %
+            (feedurl, uid, title, link, pubdate, content)
+        )
     except sqlite3.OperationalError, e:
         print >> stderr, "Cannot add item"
 
@@ -102,10 +134,9 @@ if __name__ == '__main__':
             url = raw_input("Input url: ")
             add_url(conn, url)
         elif line == 'crawl':
-            cur = conn.execute("select feedurl, lastmodified from feeds")
+            cur = conn.execute("select feedurl from feeds")
             for row in cur.fetchall():
-                #TODO: crawl
-                print row[0], row[1]
+                crawl_feed(conn, row[0])
 
         line = raw_input("Input command: ")
 
