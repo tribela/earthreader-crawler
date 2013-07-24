@@ -66,8 +66,12 @@ def query_feed_info(url):
     return (title, link, last_modified)
 
 def add_url(conn, url):
-    handle = urllib2.urlopen(url)
-    content_type = handle.headers.getheader('Content-Type')
+    try:
+        handle = urllib2.urlopen(url)
+        content_type = handle.headers.getheader('Content-Type')
+    except urllib2.URLError, e:
+        print >> stderr, "Failed to add feed"
+        return
 
     urls = []
     if content_type in ['application/rss+xml', 'application/atom+xml']:
@@ -94,6 +98,23 @@ def add_url(conn, url):
             print >> stderr, "Failed to insert " + url
             print >> stderr, e.args
     conn.commit()
+
+def parse_feed_tree(conn, feedurl, tree):
+    root = tree.getroot()
+
+    if root.tag == 'rss':
+        for item in tree.findall('./channel/item'):
+            title = item.find('title').text
+            uid = item.find('guid').text
+            link = item.find('link').text
+            pubdate = item.find('pubDate').text
+            content = item.find('description').text
+
+            print "%s at (%s)" % (title, pubdate)
+            add_item(conn, feedurl, uid, title, link, pubdate, content)
+    elif root.tag == 'feed': #ATOM
+        #TODO: parse atom feeds
+
 
 def add_item(conn, feedurl, uid, title, link, pubdate, content):
     #escape doublequote in sqlite " -> ""
@@ -124,6 +145,8 @@ def crawl_feed(conn, url):
     except urllib2.URLError, e:
         if e.getcode() == 304: #Not modified
             print "%s is not modifed since last crawling" % (url)
+        else:
+            print >> stderr, "Failed to get items"
 
 if __name__ == '__main__':
     conn = open_database()
