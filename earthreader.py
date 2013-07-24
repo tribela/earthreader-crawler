@@ -46,14 +46,14 @@ def open_database():
 
     return conn
 
-def query_feed_info(url):
+def query_feed_info(conn, url):
     handle = urllib2.urlopen(url)
     last_modified = handle.headers.getheader('Last-Modified')
 
     tree = ElementTree.parse(handle)
     root = tree.getroot()
 
-    #TODO: add items to DB
+    parse_feed_tree(conn, url, tree)
 
     if root.tag == 'rss':
         title = tree.find('./channel/title').text
@@ -85,7 +85,7 @@ def add_url(conn, url):
         try:
             print url
             #FIXME: join to one query
-            (title, link, last_modified) = query_feed_info(url)
+            (title, link, last_modified) = query_feed_info(conn, url)
             #escape
             title = title.replace("'", "''")
             link = link.replace("'", "''")
@@ -114,6 +114,7 @@ def parse_feed_tree(conn, feedurl, tree):
             add_item(conn, feedurl, uid, title, link, pubdate, content)
     elif root.tag == 'feed': #ATOM
         #TODO: parse atom feeds
+        pass
 
 
 def add_item(conn, feedurl, uid, title, link, pubdate, content):
@@ -127,11 +128,12 @@ def add_item(conn, feedurl, uid, title, link, pubdate, content):
 
     try:
         conn.execute(
-            "insert into items(feedurl, uid, title, link, pubdate, content) values('%s', '%s', '%s', '%s', '%s', '%s')" %
+            "insert into items(feedurl, uid, title, linkurl, pubdate, content) values('%s', '%s', '%s', '%s', '%s', '%s')" %
             (feedurl, uid, title, link, pubdate, content)
         )
     except sqlite3.OperationalError, e:
         print >> stderr, "Cannot add item"
+        print >> stderr, e.args
 
 def crawl_feed(conn, url):
     cur = conn.execute("select lastmodified from feeds where feedurl='%s'" % (url))
