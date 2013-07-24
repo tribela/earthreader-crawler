@@ -131,6 +131,9 @@ def add_item(conn, feedurl, uid, title, link, pubdate, content):
             "insert into items(feedurl, uid, title, linkurl, pubdate, content) values('%s', '%s', '%s', '%s', '%s', '%s')" %
             (feedurl, uid, title, link, pubdate, content)
         )
+    except sqlite3.IntegrityError, e:
+        #not unique, already exist
+        pass
     except sqlite3.OperationalError, e:
         print >> stderr, "Cannot add item"
         print >> stderr, e.args
@@ -162,6 +165,15 @@ if __name__ == '__main__':
             cur = conn.execute("select feedurl from feeds")
             for row in cur.fetchall():
                 crawl_feed(conn, row[0])
+        elif line == 'show':
+            cur = conn.execute("select feedurl, title, linkurl, pubdate from items order by feedurl asc, pubdate asc")
+            for row in cur.fetchall():
+                feedurl = row[0]
+                title = row[1]
+                linkurl = row[2]
+                pubdate = row[3]
+
+                print "%s - %s (at %s): %s" % (feedurl, title, pubdate, linkurl)
 
         line = raw_input("Input command: ")
 
