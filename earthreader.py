@@ -26,7 +26,7 @@ def open_database():
             feedurl text unique not null primary key,
             title text,
             linkurl text,
-            lastaccess datetime not null
+            lastmodified datetime not null
             );"""
         )
 
@@ -63,13 +63,35 @@ def add_url(conn, url):
             print url
             #TODO: join to one query
             #TODO: add title, linkurl
-            conn.execute("insert into feeds(feedurl, lastaccess) values('%s', datetime('now'))" % (url))
+            conn.execute("insert into feeds(feedurl, lastmodified) values('%s', datetime('now'))" % (url))
         except sqlite3.OperationalError, e:
             print >> stderr, "Failed to insert " + url
             print dir(e)
             pass
     conn.commit()
 
+def add_item(conn, feedurl, uid, title, link, pubdate, content):
+    #escape doublequote in sqlite " -> ""
+    title = title.replace('"', '""')
+    content = content.replace('"', '""')
+
+    try:
+        conn.execute("insert into items(feedurl, uid title, link, pubdate, content")
+    except sqlite3.OperationalError, e:
+        print >> stderr, "Cannot add item"
+
+def crawl_feed(conn, url):
+    cur = conn.execute("select lastmodified from feeds where feedurl='%s'" % (url))
+    last_modified = cur.fetchone()[0]
+    req = urllib2.Request(url)
+    req.add_header('If-Modified-Since', last_modified)
+
+    try:
+        content = urllib2.urlopen(req).read()
+        #TODO: add items to DB
+    except urllib2.URLError, e:
+        if e.getcode() == 304: #Not modified
+            print "%s is not modifed since last crawling" % (url)
 
 if __name__ == '__main__':
     conn = open_database()
@@ -80,7 +102,7 @@ if __name__ == '__main__':
             url = raw_input("Input url: ")
             add_url(conn, url)
         elif line == 'crawl':
-            cur = conn.execute("select feedurl, lastaccess from feeds")
+            cur = conn.execute("select feedurl, lastmodified from feeds")
             for row in cur.fetchall():
                 #TODO: crawl
                 print row[0], row[1]
